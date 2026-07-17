@@ -175,6 +175,10 @@ function App() {
             isVideoDisabled={webrtc.isVideoDisabled}
             localScreenStream={webrtc.localScreenStream}
 
+            // Sidebar camera props
+            remoteCameraStream={webrtc.remoteCameraStream}
+            isPeerVideoDisabled={webrtc.isPeerVideoDisabled}
+
             // Message overlay props
             overlayMessages={overlayMessages}
           />

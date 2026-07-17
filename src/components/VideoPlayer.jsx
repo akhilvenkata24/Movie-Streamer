@@ -37,12 +37,16 @@ export function VideoPlayer({
   localStream,
   isVideoDisabled,
   overlayMessages,
-  localScreenStream
+  localScreenStream,
+  remoteCameraStream,
+  isPeerVideoDisabled
 }) {
   const videoRef = useRef(null);
   const remoteScreenRef = useRef(null);
   const localVideoRef = useRef(null);
   const localScreenVideoRef = useRef(null);
+  const sidebarLocalVideoRef = useRef(null);
+  const sidebarRemoteVideoRef = useRef(null);
   const containerRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
   const isRemoteActionRef = useRef(false);
@@ -84,6 +88,22 @@ export function VideoPlayer({
       localScreenVideoRef.current.play().catch(e => console.log('Error playing local screen preview:', e));
     }
   }, [localScreenStream, isScreenSharing]);
+
+  // Hook sidebar local camera preview in fullscreen
+  useEffect(() => {
+    if (sidebarLocalVideoRef.current && localStream && isFullscreen) {
+      sidebarLocalVideoRef.current.srcObject = localStream;
+      sidebarLocalVideoRef.current.play().catch(e => console.log('Error playing sidebar local video:', e));
+    }
+  }, [localStream, isFullscreen, isVideoDisabled]);
+
+  // Hook sidebar remote camera preview in fullscreen
+  useEffect(() => {
+    if (sidebarRemoteVideoRef.current && remoteCameraStream && isFullscreen) {
+      sidebarRemoteVideoRef.current.srcObject = remoteCameraStream;
+      sidebarRemoteVideoRef.current.play().catch(e => console.log('Error playing sidebar remote video:', e));
+    }
+  }, [remoteCameraStream, isFullscreen, isPeerVideoDisabled]);
 
   const [videoState, setVideoState] = useState({
     url: PRELOADED_VIDEOS[0].url,
@@ -673,7 +693,7 @@ export function VideoPlayer({
 
       {/* LOCAL USER SELF PREVIEW (Mirrored FaceTime-Style overlay) */}
       {localStream && !isVideoDisabled && (
-        <div style={{
+        <div className="self-preview-bubble" style={{
           position: 'absolute',
           bottom: isPeerScreenSharing || isScreenSharing ? '24px' : '72px',
           right: '16px',
@@ -1005,6 +1025,42 @@ export function VideoPlayer({
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Column 2: Fullscreen Sidebar (only visible when in fullscreen + landscape via CSS) */}
+      {isFullscreen && (
+        <div className="fullscreen-sidebar">
+          {/* Feed 1: Partner */}
+          <div className="sidebar-feed-box">
+            {peerConnected && remoteCameraStream && !isPeerVideoDisabled ? (
+              <video
+                ref={sidebarRemoteVideoRef}
+                autoPlay
+                playsInline
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            ) : (
+              <div className="sidebar-feed-placeholder">👤 Partner (Off)</div>
+            )}
+            <div className="sidebar-feed-label">PARTNER</div>
+          </div>
+
+          {/* Feed 2: Local User */}
+          <div className="sidebar-feed-box">
+            {localStream && !isVideoDisabled ? (
+              <video
+                ref={sidebarLocalVideoRef}
+                autoPlay
+                playsInline
+                muted
+                style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
+              />
+            ) : (
+              <div className="sidebar-feed-placeholder">👤 You (Off)</div>
+            )}
+            <div className="sidebar-feed-label">YOU</div>
           </div>
         </div>
       )}
