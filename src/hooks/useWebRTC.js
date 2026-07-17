@@ -110,6 +110,23 @@ export function useWebRTC(roomCode, role) {
       }
     };
 
+    // Handle Session Renegotiation for dynamic track additions (e.g. screen sharing)
+    pc.onnegotiationneeded = async () => {
+      if (pc.signalingState !== 'stable') return;
+      try {
+        console.log('Negotiation needed: renegotiating session...');
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        socket.emit('rtc-signal', {
+          roomCode,
+          targetId: targetPeerId,
+          signal: { sdp: pc.localDescription }
+        });
+      } catch (err) {
+        console.error('Renegotiation failed:', err);
+      }
+    };
+
     // Connection state logging & stats loop
     pc.onconnectionstatechange = () => {
       console.log(`WebRTC Connection State: ${pc.connectionState}`);
