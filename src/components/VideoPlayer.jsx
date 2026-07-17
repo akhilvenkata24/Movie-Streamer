@@ -33,14 +33,24 @@ export function VideoPlayer({
   isScreenSharing,
   isPeerScreenSharing,
   remoteScreenStream,
-  toggleScreenShare
+  toggleScreenShare,
+  localStream,
+  isVideoDisabled
 }) {
   const videoRef = useRef(null);
   const remoteScreenRef = useRef(null);
+  const localVideoRef = useRef(null);
   const containerRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
   const isRemoteActionRef = useRef(false);
   const lastTapRef = useRef({ time: 0, x: 0 });
+
+  // Hook local video self preview stream
+  useEffect(() => {
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+    }
+  }, [localStream, isVideoDisabled]);
 
   const [videoState, setVideoState] = useState({
     url: PRELOADED_VIDEOS[0].url,
@@ -595,6 +605,45 @@ export function VideoPlayer({
             )
           )}
         </>
+      )}
+
+      {/* LOCAL USER SELF PREVIEW (Mirrored FaceTime-Style overlay) */}
+      {localStream && !isVideoDisabled && (
+        <div style={{
+          position: 'absolute',
+          bottom: isPeerScreenSharing || isScreenSharing ? '24px' : '72px',
+          right: '16px',
+          width: '72px',
+          height: '96px',
+          borderRadius: '8px',
+          border: '1px solid var(--accent)',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.8)',
+          overflow: 'hidden',
+          zIndex: 45,
+          background: '#000',
+          pointerEvents: 'none'
+        }}>
+          <video
+            ref={localVideoRef}
+            autoPlay
+            playsInline
+            muted
+            style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
+          />
+          <div style={{
+            position: 'absolute',
+            bottom: '2px',
+            left: '4px',
+            fontSize: '0.5rem',
+            fontWeight: '800',
+            color: '#fff',
+            background: 'rgba(0,0,0,0.6)',
+            padding: '1px 3px',
+            borderRadius: '2px'
+          }}>
+            YOU
+          </div>
+        </div>
       )}
 
       {/* DOUBLE TAP ANIMATIONS */}

@@ -169,6 +169,10 @@ function App() {
             isPeerScreenSharing={webrtc.isPeerScreenSharing}
             remoteScreenStream={webrtc.remoteScreenStream}
             toggleScreenShare={webrtc.toggleScreenShare}
+            
+            // Self preview props
+            localStream={webrtc.localStream}
+            isVideoDisabled={webrtc.isVideoDisabled}
           />
 
           {/* DRAGGABLE PEER CAMERA WIDGET */}
