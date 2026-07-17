@@ -210,33 +210,19 @@ function App() {
             toggleCamera={webrtc.toggleCamera}
             switchCamera={webrtc.switchCamera}
             isScreenSharing={webrtc.isScreenSharing}
+            isPeerScreenSharing={webrtc.isPeerScreenSharing}
+            toggleScreenShare={webrtc.toggleScreenShare}
+
+            // Room states
+            isRoomLocked={webrtc.isRoomLocked}
+            toggleRoomLock={webrtc.toggleRoomLock}
+            connectionQuality={webrtc.connectionQuality}
+            onLeaveRoom={handleLeaveRoom}
 
             // Overlay notifications
             notificationsEnabled={notificationsEnabled}
             setNotificationsEnabled={setNotificationsEnabled}
           />
-
-          {/* Floating Leave Room button */}
-          <button 
-            className="btn btn-danger touch-no-zoom"
-            onClick={handleLeaveRoom}
-            style={{
-              position: 'absolute',
-              bottom: '16px',
-              left: '16px',
-              zIndex: 30,
-              width: 'auto',
-              padding: '8px 14px',
-              fontSize: '0.8rem',
-              borderRadius: '6px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.8)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            🚪 Exit Party
-          </button>
         </div>
       )}
 

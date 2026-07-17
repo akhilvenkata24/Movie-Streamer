@@ -7,7 +7,7 @@ export function ChatDrawer({
   isOpen, 
   onClose,
   
-  // Media controls passed from useWebRTC
+  // Media controls
   localStream,
   isAudioMuted,
   isVideoDisabled,
@@ -15,13 +15,22 @@ export function ChatDrawer({
   toggleCamera,
   switchCamera,
   isScreenSharing,
+  isPeerScreenSharing,
+  toggleScreenShare,
+
+  // Room controls
+  isRoomLocked,
+  toggleRoomLock,
+  connectionQuality,
+  onLeaveRoom,
   
-  // Notification controls passed from App
+  // Notification controls
   notificationsEnabled,
   setNotificationsEnabled
 }) {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
+  const [copied, setCopied] = useState(false);
   const messagesEndRef = useRef(null);
 
   const addSystemMessage = (text) => {
@@ -44,7 +53,7 @@ export function ChatDrawer({
     scrollToBottom();
   }, [messages, isOpen]);
 
-  // Handle socket message streams
+  // Handle incoming messages & triggers
   useEffect(() => {
     const handleReceiveMessage = (message) => {
       setMessages((prev) => [
@@ -71,22 +80,33 @@ export function ChatDrawer({
       addSystemMessage(isLocked ? 'Host locked the room.' : 'Host unlocked the room.');
     };
 
+    const handleScreenShareStarted = () => {
+      addSystemMessage('Partner started screen sharing.');
+    };
+
+    const handleScreenShareStopped = () => {
+      addSystemMessage('Partner stopped screen sharing.');
+    };
+
     socket.on('receive-message', handleReceiveMessage);
     socket.on('peer-joined', handlePeerJoined);
     socket.on('peer-left', handlePeerLeft);
     socket.on('room-lock-changed', handleRoomLock);
+    socket.on('screen-share-started', handleScreenShareStarted);
+    socket.on('screen-share-stopped', handleScreenShareStopped);
 
-    addSystemMessage('Theater Room active. Share the room link.');
+    addSystemMessage('Theater active. Controls are below.');
 
     return () => {
       socket.off('receive-message', handleReceiveMessage);
       socket.off('peer-joined', handlePeerJoined);
       socket.off('peer-left', handlePeerLeft);
       socket.off('room-lock-changed', handleRoomLock);
+      socket.off('screen-share-started', handleScreenShareStarted);
+      socket.off('screen-share-stopped', handleScreenShareStopped);
     };
   }, []);
 
-  // Send Message
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (!inputText.trim()) return;
@@ -113,85 +133,174 @@ export function ChatDrawer({
     setInputText('');
   };
 
+  const handleCopyLink = () => {
+    const inviteUrl = `${window.location.origin}/?room=${roomCode}`;
+    navigator.clipboard.writeText(inviteUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const getQualityLabel = () => {
+    if (connectionQuality === 'good') return '🟢 Good';
+    if (connectionQuality === 'fair') return '🟡 Fair';
+    return '🔴 Poor';
+  };
+
   return (
     <div className={`chat-drawer ${isOpen ? 'open' : ''}`}>
-      {/* CHAT HEADER */}
-      <div className="chat-header">
-        <span className="chat-title">💬 Chat Session</span>
-        <button 
-          className="control-btn chat-toggle-landscape touch-no-zoom"
-          onClick={onClose}
-          style={{ width: '28px', height: '28px', display: 'none' }}
+      {/* 1. MASTER CONTROL PANEL HEADER (Room info, Quality & Leave) */}
+      <div style={{
+        padding: '12px 14px',
+        borderBottom: '1px solid var(--glass-border)',
+        background: '#0d0d0d',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px'
+      }}>
+        {/* Room badge + Copy Link + Exit */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: '800', letterSpacing: '0.05em', color: '#e50914' }}>
+              CODE: {roomCode}
+            </span>
+            <button 
+              className="btn btn-secondary touch-no-zoom"
+              onClick={handleCopyLink}
+              style={{ padding: '4px 8px', fontSize: '0.65rem', borderRadius: '4px', width: 'auto', background: 'rgba(255,255,255,0.05)' }}
+            >
+              {copied ? 'Copied! ✅' : '🔗 Copy Invite'}
+            </button>
+          </div>
+
+          <button 
+            className="btn btn-danger touch-no-zoom"
+            onClick={onLeaveRoom}
+            style={{ padding: '5px 10px', fontSize: '0.7rem', borderRadius: '4px', width: 'auto', background: 'var(--accent)' }}
+          >
+            🚪 LEAVE
+          </button>
+        </div>
+
+        {/* Connection quality + lock */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>Signal: <strong>{getQualityLabel()}</strong></span>
+            <span style={{ color: 'var(--text-muted)' }}>|</span>
+            <span>Status: <strong>{isRoomLocked ? '🔒 Locked' : '🔓 Open'}</strong></span>
+          </div>
+
+          <button
+            className="touch-no-zoom"
+            onClick={toggleRoomLock}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: isRoomLocked ? 'var(--accent)' : 'var(--text-secondary)',
+              cursor: 'pointer',
+              fontWeight: '700',
+              textTransform: 'uppercase',
+              fontSize: '0.7rem'
+            }}
+          >
+            {isRoomLocked ? 'Unlock Room' : 'Lock Room'}
+          </button>
+        </div>
+      </div>
+
+      {/* 2. CALL MEDIA & SCREEN SHARE CONTROL PANEL (Netflix Style Red Round buttons) */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        padding: '12px',
+        borderBottom: '1px solid var(--glass-border)',
+        background: '#181818',
+        gap: '6px'
+      }}>
+        {/* Mic Toggle */}
+        <button
+          className="btn btn-secondary touch-no-zoom"
+          onClick={toggleMic}
+          style={{
+            padding: '8px 2px',
+            fontSize: '0.7rem',
+            borderRadius: '6px',
+            flexDirection: 'column',
+            gap: '4px',
+            background: isAudioMuted ? 'rgba(229, 9, 20, 0.25)' : 'rgba(255,255,255,0.04)',
+            borderColor: isAudioMuted ? 'var(--accent)' : 'transparent',
+            height: '52px'
+          }}
         >
-          ✕
+          <span style={{ fontSize: '1rem' }}>{isAudioMuted ? '🔇' : '🎙️'}</span>
+          <span>{isAudioMuted ? 'Muted' : 'Mic On'}</span>
+        </button>
+
+        {/* Camera Toggle */}
+        <button
+          className="btn btn-secondary touch-no-zoom"
+          onClick={toggleCamera}
+          style={{
+            padding: '8px 2px',
+            fontSize: '0.7rem',
+            borderRadius: '6px',
+            flexDirection: 'column',
+            gap: '4px',
+            background: isVideoDisabled ? 'rgba(229, 9, 20, 0.25)' : 'rgba(255,255,255,0.04)',
+            borderColor: isVideoDisabled ? 'var(--accent)' : 'transparent',
+            height: '52px'
+          }}
+        >
+          <span style={{ fontSize: '1rem' }}>{isVideoDisabled ? '❌' : '🎥'}</span>
+          <span>{isVideoDisabled ? 'Cam Off' : 'Cam On'}</span>
+        </button>
+
+        {/* Swap lens */}
+        <button
+          className="btn btn-secondary touch-no-zoom"
+          onClick={switchCamera}
+          disabled={isVideoDisabled}
+          style={{
+            padding: '8px 2px',
+            fontSize: '0.7rem',
+            borderRadius: '6px',
+            flexDirection: 'column',
+            gap: '4px',
+            background: 'rgba(255,255,255,0.04)',
+            borderColor: 'transparent',
+            height: '52px',
+            opacity: isVideoDisabled ? 0.3 : 1
+          }}
+        >
+          <span style={{ fontSize: '1rem' }}>🔄</span>
+          <span>Swap Cam</span>
+        </button>
+
+        {/* Screen Share */}
+        <button
+          className="btn btn-secondary touch-no-zoom"
+          onClick={toggleScreenShare}
+          disabled={isPeerScreenSharing}
+          style={{
+            padding: '8px 2px',
+            fontSize: '0.7rem',
+            borderRadius: '6px',
+            flexDirection: 'column',
+            gap: '4px',
+            background: isScreenSharing ? 'var(--accent)' : 'rgba(255,255,255,0.04)',
+            borderColor: 'transparent',
+            height: '52px',
+            color: '#fff',
+            opacity: isPeerScreenSharing ? 0.3 : 1
+          }}
+          title={isPeerScreenSharing ? 'Another participant is currently sharing.' : 'Share screen'}
+        >
+          <span style={{ fontSize: '1rem' }}>{isScreenSharing ? '🛑' : '🖥️'}</span>
+          <span>{isScreenSharing ? 'Stop' : 'Share'}</span>
         </button>
       </div>
 
-      {/* CALL MEDIA CONTROL PANEL (Netflix Style Red Round buttons) */}
-      {localStream && (
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-around',
-          alignItems: 'center',
-          padding: '12px 8px',
-          borderBottom: '1px solid var(--glass-border)',
-          background: 'rgba(255,255,255,0.02)',
-          gap: '8px'
-        }}>
-          {/* Mute Mic */}
-          <button
-            className="btn btn-secondary touch-no-zoom"
-            onClick={toggleMic}
-            style={{
-              flex: 1,
-              padding: '8px 4px',
-              fontSize: '0.75rem',
-              borderRadius: '6px',
-              background: isAudioMuted ? 'rgba(229, 9, 20, 0.2)' : 'rgba(255,255,255,0.05)',
-              borderColor: isAudioMuted ? 'var(--accent)' : 'var(--glass-border)'
-            }}
-            title={isAudioMuted ? 'Unmute microphone' : 'Mute microphone'}
-          >
-            {isAudioMuted ? '🔇 Mic Off' : '🎙️ Mic On'}
-          </button>
-
-          {/* Toggle Camera */}
-          <button
-            className="btn btn-secondary touch-no-zoom"
-            onClick={toggleCamera}
-            style={{
-              flex: 1,
-              padding: '8px 4px',
-              fontSize: '0.75rem',
-              borderRadius: '6px',
-              background: isVideoDisabled ? 'rgba(229, 9, 20, 0.2)' : 'rgba(255,255,255,0.05)',
-              borderColor: isVideoDisabled ? 'var(--accent)' : 'var(--glass-border)'
-            }}
-            title={isVideoDisabled ? 'Enable camera' : 'Disable camera'}
-          >
-            {isVideoDisabled ? '📷 Cam Off' : '🎥 Cam On'}
-          </button>
-
-          {/* Switch camera user/environment */}
-          <button
-            className="btn btn-secondary touch-no-zoom"
-            onClick={switchCamera}
-            disabled={isVideoDisabled}
-            style={{
-              flex: 1,
-              padding: '8px 4px',
-              fontSize: '0.75rem',
-              borderRadius: '6px',
-              background: 'rgba(255,255,255,0.05)'
-            }}
-            title="Switch front/rear camera"
-          >
-            🔄 Swap Lens
-          </button>
-        </div>
-      )}
-
-      {/* SETTINGS / ALERTS TOGGLE BAR */}
+      {/* 3. SETTINGS / ALERTS TOGGLE BAR */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -199,7 +308,8 @@ export function ChatDrawer({
         padding: '8px 16px',
         fontSize: '0.75rem',
         borderBottom: '1px solid var(--glass-border)',
-        color: 'var(--text-secondary)'
+        color: 'var(--text-secondary)',
+        background: '#111'
       }}>
         <span>Overlay Notifications</span>
         <button
@@ -220,8 +330,8 @@ export function ChatDrawer({
         </button>
       </div>
 
-      {/* MESSAGES LOG */}
-      <div className="messages-list">
+      {/* 4. MESSAGES LOG */}
+      <div className="messages-list" style={{ flex: 1 }}>
         {messages.map((msg) => (
           msg.type === 'system' ? (
             <div key={msg.id} className="system-message">
@@ -245,7 +355,7 @@ export function ChatDrawer({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* INPUT FORM */}
+      {/* 5. INPUT FORM */}
       <form onSubmit={handleSendMessage} className="chat-input-bar">
         <input
           type="text"

@@ -543,13 +543,10 @@ export function VideoPlayer({
           textAlign: 'center'
         }}>
           <span style={{ fontSize: '3rem', animation: 'pulse-glow 2s infinite' }}>🖥️</span>
-          <h3 style={{ fontSize: '1.25rem', margin: '16px 0 8px', color: 'var(--accent)' }}>You are sharing your screen</h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', maxWidth: '300px', marginBottom: '24px' }}>
+          <h3 style={{ fontSize: '1.2rem', margin: '16px 0 8px', color: 'var(--accent)' }}>You are sharing your screen</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', maxWidth: '300px' }}>
             Your partner sees everything on your screen in real-time.
           </p>
-          <button className="btn btn-primary touch-no-zoom" onClick={toggleScreenShare} style={{ maxWidth: '200px' }}>
-            Stop Sharing
-          </button>
         </div>
       ) : (
         /* 3. NORMAL MOVIE STREAM RENDERING */
@@ -632,64 +629,42 @@ export function VideoPlayer({
       )}
 
       {/* OVERLAY CONTROLS */}
-      <div className={`video-controls ${controlsVisible ? 'visible' : ''}`}>
-        
-        {/* TOP BAR CONTROLS */}
-        <div className="controls-top">
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <div 
-              className="room-badge touch-no-zoom" 
-              onClick={handleCopyRoomCode} 
-              style={{ cursor: 'pointer' }}
-              title="Click to copy invite link"
-            >
-              <span className={`badge-pulse ${peerConnected ? '' : 'disconnected'}`}></span>
-              <span>Room: {roomCode} {copied ? '(Copied! ✅)' : '(Invite 🔗)'}</span>
+      {!isPeerScreenSharing && !isScreenSharing && (
+        <div className={`video-controls ${controlsVisible ? 'visible' : ''}`}>
+          
+          {/* TOP BAR CONTROLS */}
+          <div className="controls-top">
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div 
+                className="room-badge touch-no-zoom" 
+                onClick={handleCopyRoomCode} 
+                style={{ cursor: 'pointer' }}
+                title="Click to copy invite link"
+              >
+                <span className={`badge-pulse ${peerConnected ? '' : 'disconnected'}`}></span>
+                <span>Room: {roomCode} {copied ? '(Copied! ✅)' : '(Invite 🔗)'}</span>
+              </div>
+
+              {/* Room Lock Button */}
+              <button 
+                className="control-btn touch-no-zoom"
+                onClick={toggleRoomLock}
+                style={{ width: '28px', height: '28px', background: 'rgba(0,0,0,0.6)', border: '1px solid var(--glass-border)', padding: 0 }}
+                title={isRoomLocked ? 'Room is Locked' : 'Room is Open'}
+              >
+                {isRoomLocked ? '🔒' : '🔓'}
+              </button>
+
+              {/* Quality Indicator */}
+              {peerConnected && (
+                <span style={{ fontSize: '0.7rem', fontWeight: '700', padding: '4px 8px', background: 'rgba(0,0,0,0.6)', border: '1px solid var(--glass-border)', borderRadius: '4px' }}>
+                  {getQualityText()}
+                </span>
+              )}
             </div>
 
-            {/* Room Lock Button */}
-            <button 
-              className="control-btn touch-no-zoom"
-              onClick={toggleRoomLock}
-              style={{ width: '28px', height: '28px', background: 'rgba(0,0,0,0.6)', border: '1px solid var(--glass-border)', padding: 0 }}
-              title={isRoomLocked ? 'Room is Locked' : 'Room is Open'}
-            >
-              {isRoomLocked ? '🔒' : '🔓'}
-            </button>
-
-            {/* Quality Indicator */}
-            {peerConnected && (
-              <span style={{ fontSize: '0.7rem', fontWeight: '700', padding: '4px 8px', background: 'rgba(0,0,0,0.6)', border: '1px solid var(--glass-border)', borderRadius: '4px' }}>
-                {getQualityText()}
-              </span>
-            )}
-          </div>
-
-          {/* Video Library / Screen Share buttons */}
-          <div style={{ display: 'flex', gap: '8px' }}>
-            
-            {/* Screen Share Button */}
-            <button
-              className="control-btn touch-no-zoom"
-              onClick={toggleScreenShare}
-              disabled={isPeerScreenSharing}
-              style={{
-                width: 'auto',
-                padding: '0 12px',
-                fontSize: '0.8rem',
-                fontWeight: '700',
-                background: isScreenSharing ? 'var(--accent)' : 'rgba(0,0,0,0.6)',
-                border: '1px solid var(--glass-border)',
-                borderRadius: '4px',
-                color: '#fff'
-              }}
-              title={isPeerScreenSharing ? 'Another participant is currently sharing.' : 'Share screen'}
-            >
-              {isScreenSharing ? '🛑 Stop Screen' : '🖥️ Share Screen'}
-            </button>
-
-            {/* Movie source library */}
-            {!isPeerScreenSharing && !isScreenSharing && (
+            {/* Video Library / Speed buttons */}
+            <div style={{ display: 'flex', gap: '8px' }}>
               <div className="select-menu-container">
                 <button 
                   className="control-btn touch-no-zoom" 
@@ -737,10 +712,8 @@ export function VideoPlayer({
                   </div>
                 )}
               </div>
-            )}
 
-            {/* Playback speed dropdown */}
-            {!isPeerScreenSharing && !isScreenSharing && (
+              {/* Playback speed dropdown */}
               <div className="select-menu-container">
                 <button 
                   className="control-btn touch-no-zoom" 
@@ -768,59 +741,57 @@ export function VideoPlayer({
                   </div>
                 )}
               </div>
-            )}
+            </div>
           </div>
-        </div>
 
-        {/* CUSTOM NET URL INPUT POPUP */}
-        {showUrlInput && (
-          <div style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            background: 'var(--glass-bg-dense)',
-            border: '1px solid var(--glass-border)',
-            borderRadius: '8px',
-            padding: '24px',
-            zIndex: 110,
-            width: '90%',
-            maxWidth: '360px',
-            boxShadow: 'var(--shadow-lg)'
-          }}>
-            <form onSubmit={handleCustomUrlSubmit}>
-              <h4 style={{ marginBottom: '14px', fontSize: '0.9rem', textTransform: 'uppercase', color: 'var(--accent)' }}>Paste Direct MP4 URL</h4>
-              <input 
-                type="url" 
-                placeholder="https://example.com/movie.mp4" 
-                value={customUrl}
-                onChange={(e) => setCustomUrl(e.target.value)}
-                className="input-field"
-                required
-                style={{ marginBottom: '16px' }}
-              />
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button type="button" className="btn btn-secondary touch-no-zoom" onClick={() => setShowUrlInput(false)} style={{ flex: 1 }}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary touch-no-zoom" style={{ flex: 1.5 }}>
-                  Play Stream
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
+          {/* CUSTOM NET URL INPUT POPUP */}
+          {showUrlInput && (
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              background: 'var(--glass-bg-dense)',
+              border: '1px solid var(--glass-border)',
+              borderRadius: '8px',
+              padding: '24px',
+              zIndex: 110,
+              width: '90%',
+              maxWidth: '360px',
+              boxShadow: 'var(--shadow-lg)'
+            }}>
+              <form onSubmit={handleCustomUrlSubmit}>
+                <h4 style={{ marginBottom: '14px', fontSize: '0.9rem', textTransform: 'uppercase', color: 'var(--accent)' }}>Paste Direct MP4 URL</h4>
+                <input 
+                  type="url" 
+                  placeholder="https://example.com/movie.mp4" 
+                  value={customUrl}
+                  onChange={(e) => setCustomUrl(e.target.value)}
+                  className="input-field"
+                  required
+                  style={{ marginBottom: '16px' }}
+                />
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button type="button" className="btn btn-secondary touch-no-zoom" onClick={() => setShowUrlInput(false)} style={{ flex: 1 }}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary touch-no-zoom" style={{ flex: 1.5 }}>
+                    Play Stream
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
 
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          style={{ display: 'none' }} 
-          accept="video/*" 
-          onChange={handleLocalFileChange}
-        />
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            style={{ display: 'none' }} 
+            accept="video/*" 
+            onChange={handleLocalFileChange}
+          />
 
-        {/* BOTTOM TIMELINE & PLAYER CONTROLS (Hidden during screen sharing) */}
-        {!isPeerScreenSharing && !isScreenSharing && (
+          {/* BOTTOM TIMELINE & PLAYER CONTROLS */}
           <div className="controls-bottom">
             <div style={{ fontSize: '0.8rem', fontWeight: '700', color: 'rgba(255,255,255,0.95)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               🍿 NOW PLAYING: {videoState.title.toUpperCase()}
@@ -900,26 +871,8 @@ export function VideoPlayer({
               </div>
             </div>
           </div>
-        )}
-
-        {/* CONTROLS IN SCREEN SHARING MODE (Minimal bar) */}
-        {(isPeerScreenSharing || isScreenSharing) && (
-          <div className="controls-bottom">
-            <div className="controls-row">
-              <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#fff' }}>
-                {isScreenSharing ? '🖥️ SCREEN SHARING SESSION' : '🖥️ PARTNER IS SHARING SCREEN'}
-              </div>
-              <button 
-                className="control-btn chat-toggle-landscape touch-no-zoom" 
-                onClick={onChatToggle}
-                style={{ width: 'auto', padding: '0 8px', fontSize: '0.8rem', gap: '4px', display: 'none', background: 'rgba(0,0,0,0.6)', border: '1px solid var(--glass-border)' }}
-              >
-                💬 Chat {chatOpen ? '◀' : '▶'}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

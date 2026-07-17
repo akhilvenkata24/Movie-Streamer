@@ -37,6 +37,7 @@ export function useWebRTC(roomCode, role) {
   const dataChannelRef = useRef(null);
   const sendersRef = useRef({ audio: null, video: null, screen: null });
   const onMessageCallbackRef = useRef(null);
+  const cameraStreamIdRef = useRef(null);
 
   const registerOnMessage = useCallback((callback) => {
     onMessageCallbackRef.current = callback;
@@ -122,22 +123,34 @@ export function useWebRTC(roomCode, role) {
 
     // Receive Remote Streams
     pc.ontrack = (event) => {
-      console.log('Received remote track:', event.track.kind, event.streams[0]);
+      console.log('Received remote track:', event.track.kind, event.streams[0]?.id);
       const incomingStream = event.streams[0];
-      const trackId = event.track.id;
+      if (!incomingStream) return;
+      
+      const streamId = incomingStream.id;
 
-      // Map tracks to Camera or Screen Share based on peer's announcement
-      if (peerScreenTrackId && trackId === peerScreenTrackId) {
+      if (!cameraStreamIdRef.current) {
+        // First stream received is the camera/audio stream
+        cameraStreamIdRef.current = streamId;
+        setRemoteCameraStream(incomingStream);
+      } else if (streamId === cameraStreamIdRef.current) {
+        // Belongs to the camera stream
+        setRemoteCameraStream(incomingStream);
+      } else {
+        // Belongs to a different stream (Screen Share!)
         setRemoteScreenStream(incomingStream);
         setIsPeerScreenSharing(true);
-      } else {
-        if (event.track.kind === 'video') {
-          setRemoteCameraStream(incomingStream);
-        } else if (event.track.kind === 'audio') {
-          // Play remote audio stream using standard HTML audio
-          setRemoteCameraStream(incomingStream); // Audio and video are bound in the same incoming stream
-        }
+        setPeerScreenTrackId(event.track.id);
       }
+
+      event.track.onended = () => {
+        console.log('Track ended:', event.track.kind, streamId);
+        if (streamId !== cameraStreamIdRef.current) {
+          setIsPeerScreenSharing(false);
+          setRemoteScreenStream(null);
+          setPeerScreenTrackId(null);
+        }
+      };
     };
 
     // Host creates the Data Channel
@@ -232,6 +245,37 @@ export function useWebRTC(roomCode, role) {
     });
   };
 
+  // Fallback notification via socket if WebRTC P2P channel is closed
+  const notifyMediaStatus = (audioMuted, videoDisabled) => {
+    const payload = { type: 'media-mute-status', audioMuted, videoDisabled };
+    const sent = sendP2PNotification(payload);
+    if (!sent) {
+      socket.emit('sync-playback', {
+        roomCode,
+        action: 'media-mute-status',
+        currentTime: 0,
+        playing: false,
+        speed: 1,
+        additionalData: payload
+      });
+    }
+  };
+
+  const notifyScreenShare = (isSharing, trackId = null) => {
+    const payload = { type: 'peer-screen-share', isSharing, trackId };
+    const sent = sendP2PNotification(payload);
+    if (!sent) {
+      socket.emit('sync-playback', {
+        roomCode,
+        action: 'peer-screen-share',
+        currentTime: 0,
+        playing: false,
+        speed: 1,
+        additionalData: payload
+      });
+    }
+  };
+
   // Toggle Microphone
   const toggleMic = () => {
     if (localStream) {
@@ -239,13 +283,7 @@ export function useWebRTC(roomCode, role) {
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
         setIsAudioMuted(!audioTrack.enabled);
-        
-        // Notify peer of mute status
-        sendP2PNotification({
-          type: 'media-mute-status',
-          audioMuted: !audioTrack.enabled,
-          videoDisabled: isVideoDisabled
-        });
+        notifyMediaStatus(!audioTrack.enabled, isVideoDisabled);
       }
     }
   };
@@ -257,13 +295,7 @@ export function useWebRTC(roomCode, role) {
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
         setIsVideoDisabled(!videoTrack.enabled);
-        
-        // Notify peer
-        sendP2PNotification({
-          type: 'media-mute-status',
-          audioMuted: isAudioMuted,
-          videoDisabled: !videoTrack.enabled
-        });
+        notifyMediaStatus(isAudioMuted, !videoTrack.enabled);
       }
     }
   };
@@ -325,11 +357,7 @@ export function useWebRTC(roomCode, role) {
       
       setIsScreenSharing(false);
       socket.emit('stop-screen-share', { roomCode }, () => {});
-      
-      sendP2PNotification({
-        type: 'peer-screen-share',
-        isSharing: false
-      });
+      notifyScreenShare(false);
     } else {
       // START SCREEN SHARE
       if (isPeerScreenSharing) {
@@ -357,17 +385,13 @@ export function useWebRTC(roomCode, role) {
             return;
           }
 
-          // Add screen share track to PeerConnection (this triggers renegotiation offer)
+          // Add screen share track to PeerConnection
           if (pcRef.current) {
             sendersRef.current.screen = pcRef.current.addTrack(screenTrack, screenStream);
           }
 
           // Announce screen track ID to the peer
-          sendP2PNotification({
-            type: 'peer-screen-share',
-            isSharing: true,
-            trackId: screenTrack.id
-          });
+          notifyScreenShare(true, screenTrack.id);
         });
 
         // Listen for screen sharing stop via native browser controls
@@ -398,7 +422,6 @@ export function useWebRTC(roomCode, role) {
   const sendSyncMessage = useCallback((payload) => {
     const sent = sendP2PNotification(payload);
     if (!sent) {
-      // Fallback
       socket.emit('sync-playback', {
         roomCode,
         action: payload.type,
@@ -523,12 +546,29 @@ export function useWebRTC(roomCode, role) {
       }
     };
 
+    const handleSyncPlaybackFallback = (data) => {
+      const actionType = data.action || data.type;
+      if (actionType === 'media-mute-status') {
+        const addData = data.additionalData;
+        setIsPeerAudioMuted(addData.audioMuted);
+        setIsPeerVideoDisabled(addData.videoDisabled);
+      } else if (actionType === 'peer-screen-share') {
+        const addData = data.additionalData;
+        setIsPeerScreenSharing(addData.isSharing);
+        setPeerScreenTrackId(addData.trackId || null);
+        if (!addData.isSharing) {
+          setRemoteScreenStream(null);
+        }
+      }
+    };
+
     socket.on('peer-joined', handlePeerJoined);
     socket.on('rtc-signal', handleRtcSignal);
     socket.on('peer-left', handlePeerLeft);
     socket.on('room-lock-changed', handleRoomLockChanged);
     socket.on('screen-share-started', handleScreenShareStarted);
     socket.on('screen-share-stopped', handleScreenShareStopped);
+    socket.on('sync-playback', handleSyncPlaybackFallback);
 
     return () => {
       socket.off('peer-joined', handlePeerJoined);
@@ -537,6 +577,7 @@ export function useWebRTC(roomCode, role) {
       socket.off('room-lock-changed', handleRoomLockChanged);
       socket.off('screen-share-started', handleScreenShareStarted);
       socket.off('screen-share-stopped', handleScreenShareStopped);
+      socket.off('sync-playback', handleSyncPlaybackFallback);
 
       // Close and clear streams
       if (pcRef.current) {
