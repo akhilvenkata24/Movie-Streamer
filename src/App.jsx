@@ -173,6 +173,9 @@ function App() {
             // Self preview props
             localStream={webrtc.localStream}
             isVideoDisabled={webrtc.isVideoDisabled}
+
+            // Message overlay props
+            overlayMessages={overlayMessages}
           />
 
           {/* DRAGGABLE PEER CAMERA WIDGET */}
@@ -182,21 +185,6 @@ function App() {
               isPeerVideoDisabled={webrtc.isPeerVideoDisabled}
               nickname={roomData.role === 'host' ? 'Guest' : 'Host'}
             />
-          )}
-
-          {/* TRANSIENT CHAT OVERLAY BUBBLES */}
-          {!chatOpen && overlayMessages.length > 0 && (
-            <div className="chat-overlay-container">
-              {overlayMessages.map((msg) => (
-                <div 
-                  key={msg.id} 
-                  className={`chat-overlay-bubble ${msg.isFading ? 'fade-out' : ''}`}
-                >
-                  <span className="chat-overlay-sender">{msg.sender}</span>
-                  <span>{msg.text}</span>
-                </div>
-              ))}
-            </div>
           )}
 
           {/* Sidebar Chat Drawer & Media Buttons */}

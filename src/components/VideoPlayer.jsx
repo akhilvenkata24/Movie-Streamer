@@ -35,7 +35,8 @@ export function VideoPlayer({
   remoteScreenStream,
   toggleScreenShare,
   localStream,
-  isVideoDisabled
+  isVideoDisabled,
+  overlayMessages
 }) {
   const videoRef = useRef(null);
   const remoteScreenRef = useRef(null);
@@ -45,12 +46,33 @@ export function VideoPlayer({
   const isRemoteActionRef = useRef(false);
   const lastTapRef = useRef({ time: 0, x: 0 });
 
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Fullscreen state listener
+  useEffect(() => {
+    const handleFs = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFs);
+    return () => document.removeEventListener('fullscreenchange', handleFs);
+  }, []);
+
   // Hook local video self preview stream
   useEffect(() => {
     if (localVideoRef.current && localStream) {
       localVideoRef.current.srcObject = localStream;
+      localVideoRef.current.play().catch(e => console.log('Error playing self preview:', e));
     }
   }, [localStream, isVideoDisabled]);
+
+  // Hook remote screen share stream
+  useEffect(() => {
+    if (remoteScreenRef.current && remoteScreenStream) {
+      console.log('Hooking remote screen share stream to video element');
+      remoteScreenRef.current.srcObject = remoteScreenStream;
+      remoteScreenRef.current.play().catch(e => console.log('Error playing remote screen:', e));
+    }
+  }, [remoteScreenStream, isPeerScreenSharing]);
 
   const [videoState, setVideoState] = useState({
     url: PRELOADED_VIDEOS[0].url,
@@ -524,11 +546,34 @@ export function VideoPlayer({
     return '🔴 Poor Connection';
   };
 
+  const handlePlayerClick = (e) => {
+    // If clicking inside control panels, dropdown menus, inputs, or play buttons, ignore
+    if (
+      e.target.closest('.controls-top') || 
+      e.target.closest('.controls-bottom') || 
+      e.target.closest('.select-dropdown') || 
+      e.target.closest('.center-play-btn') ||
+      e.target.closest('.select-menu-container') ||
+      e.target.tagName === 'FORM' ||
+      e.target.tagName === 'INPUT' ||
+      e.target.tagName === 'BUTTON'
+    ) {
+      return;
+    }
+    
+    if (controlsVisible) {
+      setControlsVisible(false);
+    } else {
+      triggerShowControls();
+    }
+  };
+
   return (
     <div 
       className="video-container" 
       ref={containerRef}
       onTouchStart={handleTouchStart}
+      onClick={handlePlayerClick}
     >
       {/* 1. REMOTE SCREEN SHARE RENDERING */}
       {isPeerScreenSharing && remoteScreenStream ? (
@@ -595,7 +640,6 @@ export function VideoPlayer({
               ref={videoRef}
               src={videoState.url}
               playsInline
-              onClick={handlePlayToggle}
             />
           ) : (
             !localFileWarning && (
@@ -643,6 +687,20 @@ export function VideoPlayer({
           }}>
             YOU
           </div>
+        </div>
+      )}
+      {/* TRANSIENT CHAT OVERLAY BUBBLES (Rendered inside video player to remain visible in fullscreen) */}
+      {!chatOpen && overlayMessages && overlayMessages.length > 0 && (
+        <div className="chat-overlay-container" style={{ bottom: isPeerScreenSharing || isScreenSharing ? '24px' : '84px', zIndex: 120 }}>
+          {overlayMessages.map((msg) => (
+            <div 
+              key={msg.id} 
+              className={`chat-overlay-bubble ${msg.isFading ? 'fade-out' : ''}`}
+            >
+              <span className="chat-overlay-sender">{msg.sender}</span>
+              <span>{msg.text}</span>
+            </div>
+          ))}
         </div>
       )}
 
@@ -915,7 +973,15 @@ export function VideoPlayer({
                     containerRef.current.requestFullscreen().catch(e => console.log(e));
                   }
                 }}>
-                  <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+                  {isFullscreen ? (
+                    <svg viewBox="0 0 24 24" style={{ width: '20px', height: '20px', fill: '#fff' }}>
+                      <path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/>
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" style={{ width: '20px', height: '20px', fill: '#fff' }}>
+                      <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+                    </svg>
+                  )}
                 </button>
               </div>
             </div>

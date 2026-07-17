@@ -32,6 +32,7 @@ export function FloatingCamera({ remoteStream, isPeerVideoDisabled, nickname }) 
   useEffect(() => {
     if (videoRef.current && remoteStream && !isPeerVideoDisabled) {
       videoRef.current.srcObject = remoteStream;
+      videoRef.current.play().catch(e => console.log('Error playing remote stream:', e));
     }
   }, [remoteStream, isPeerVideoDisabled]);
 
@@ -100,22 +101,27 @@ export function FloatingCamera({ remoteStream, isPeerVideoDisabled, nickname }) 
     }, 300);
   };
 
-  // Mouse event wrappers
+  // Mouse event handlers via useEffect to prevent stale closures
+  useEffect(() => {
+    if (isDragging) {
+      const handleMouseMove = (e) => {
+        handleDragMove(e.clientX, e.clientY);
+      };
+      const handleMouseUp = () => {
+        handleDragEnd();
+      };
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging]);
+
   const onMouseDown = (e) => {
     if (e.target.closest('.floating-camera-btn')) return; // Avoid drag on button clicks
     handleDragStart(e.clientX, e.clientY);
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  };
-
-  const onMouseMove = (e) => {
-    handleDragMove(e.clientX, e.clientY);
-  };
-
-  const onMouseUp = () => {
-    handleDragEnd();
-    document.removeEventListener('mousemove', onMouseMove);
-    document.removeEventListener('mouseup', onMouseUp);
   };
 
   // Touch event wrappers (for mobile support)

@@ -329,8 +329,15 @@ h1, h2, h3, h4, h5, h6 {
 /* Desktop Side-by-side Layout */
 @media (min-width: 1025px) {
   .watch-room {
-    grid-template-columns: 1fr 360px;
+    grid-template-columns: 1fr;
     grid-template-rows: 1fr;
+    transition: grid-template-columns 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .watch-room.chat-active {
+    grid-template-columns: 1fr 360px;
+  }
+  .watch-room:not(.chat-active) .chat-drawer {
+    display: none;
   }
 }
 
