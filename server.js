@@ -39,7 +39,7 @@ const distPath = path.join(__dirname, 'dist');
 if (fs.existsSync(distPath)) {
   console.log('Production client folder found. Serving static files.');
   app.use(express.static(distPath));
-  app.get('(.*)', (req, res) => {
+  app.get('*splat', (req, res) => {
     res.sendFile(path.join(distPath, 'index.html'));
   });
 } else {
