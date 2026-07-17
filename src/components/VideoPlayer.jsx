@@ -36,11 +36,13 @@ export function VideoPlayer({
   toggleScreenShare,
   localStream,
   isVideoDisabled,
-  overlayMessages
+  overlayMessages,
+  localScreenStream
 }) {
   const videoRef = useRef(null);
   const remoteScreenRef = useRef(null);
   const localVideoRef = useRef(null);
+  const localScreenVideoRef = useRef(null);
   const containerRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
   const isRemoteActionRef = useRef(false);
@@ -73,6 +75,15 @@ export function VideoPlayer({
       remoteScreenRef.current.play().catch(e => console.log('Error playing remote screen:', e));
     }
   }, [remoteScreenStream, isPeerScreenSharing]);
+
+  // Hook local screen share preview
+  useEffect(() => {
+    if (localScreenVideoRef.current && localScreenStream) {
+      console.log('Hooking local screen share stream to video element');
+      localScreenVideoRef.current.srcObject = localScreenStream;
+      localScreenVideoRef.current.play().catch(e => console.log('Error playing local screen preview:', e));
+    }
+  }, [localScreenStream, isScreenSharing]);
 
   const [videoState, setVideoState] = useState({
     url: PRELOADED_VIDEOS[0].url,
@@ -584,8 +595,17 @@ export function VideoPlayer({
           playsInline
           muted
         />
+      ) : isScreenSharing && localScreenStream ? (
+        /* 2. LOCAL SCREEN SHARING LIVE PREVIEW (No Mirroring) */
+        <video 
+          className="video-element"
+          ref={localScreenVideoRef}
+          autoPlay
+          playsInline
+          muted
+        />
       ) : isScreenSharing ? (
-        /* 2. LOCAL SCREEN SHARER WATERMARK */
+        /* Fallback placeholder when stream is initializing */
         <div style={{
           position: 'absolute',
           inset: 0,
@@ -600,7 +620,7 @@ export function VideoPlayer({
           <span style={{ fontSize: '3rem', animation: 'pulse-glow 2s infinite' }}>🖥️</span>
           <h3 style={{ fontSize: '1.2rem', margin: '16px 0 8px', color: 'var(--accent)' }}>You are sharing your screen</h3>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', maxWidth: '300px' }}>
-            Your partner sees everything on your screen in real-time.
+            Capturing stream, please wait...
           </p>
         </div>
       ) : (

@@ -173,6 +173,7 @@ function App() {
             // Self preview props
             localStream={webrtc.localStream}
             isVideoDisabled={webrtc.isVideoDisabled}
+            localScreenStream={webrtc.localScreenStream}
 
             // Message overlay props
             overlayMessages={overlayMessages}
