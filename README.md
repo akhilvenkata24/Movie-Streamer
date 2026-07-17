@@ -55,7 +55,7 @@ To host CineSync on Render as a single web service:
    - **Environment**: `Node`
    - **Build Command**: 
      ```bash
-     npm install && npm run build
+     npm install --include=dev && npm run build
      ```
    - **Start Command**: 
      ```bash
